@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QR Pitaka</title>
+<meta name="description" content="Your GCash, Maya and bank QR codes in one place.">
+<meta name="theme-color" content="#0E6E66">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="QR Pitaka">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script src="qrcode.js"></script>
+<script src="jsQR.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-column wallet — stacked pass cards, a bottom sheet for each code, a sheet for adding */
+:root{
+  --bg:#EEF2F4; --surface:#FFFFFF; --sunk:#E3E9ED; --ink:#13202A; --muted:#5A6874; --line:#D5DDE3;
+  --accent:#0E6E66; --accent-ink:#FFFFFF; --danger:#B42318; --ok:#0F7A3D;
+  --gcash:#1A5FD6; --maya:#0E9F5B; --bank:#5A4BB5; --other:#6B7680;
+  --f-display:"Bricolage Grotesque",ui-rounded,system-ui,sans-serif;
+  --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1317; --surface:#151D23; --sunk:#1C262D; --ink:#E6ECF0; --muted:#93A1AC; --line:#26323A;
+  --accent:#2FC4B2; --accent-ink:#06201D; --danger:#F07167; --ok:#4ADE80;
+  --gcash:#5B93F5; --maya:#3FD08A; --bank:#9E92F0; --other:#97A3AD; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1317; --surface:#151D23; --sunk:#1C262D; --ink:#E6ECF0; --muted:#93A1AC; --line:#26323A;
+  --accent:#2FC4B2; --accent-ink:#06201D; --danger:#F07167; --ok:#4ADE80;
+  --gcash:#5B93F5; --maya:#3FD08A; --bank:#9E92F0; --other:#97A3AD; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink);margin:0}
+html{padding-top:env(safe-area-inset-top,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 96px;display:flex;flex-direction:column;gap:18px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:800;font-size:30px;letter-spacing:-.02em;margin:0;line-height:1}
+h1 small{display:block;font-family:var(--f-body);font-weight:500;font-size:13px;color:var(--muted);letter-spacing:0;margin-top:6px}
+h2{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0;text-wrap:balance}
+.status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--ok)}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:10px 16px;font-weight:600;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--danger)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,input:focus-visible,textarea:focus-visible,.pass:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.list{display:flex;flex-direction:column;gap:12px}
+.pass{all:unset;cursor:pointer;display:grid;grid-template-columns:56px 1fr auto;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;position:relative;overflow:hidden}
+.pass::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--brand,var(--other))}
+.thumb{width:56px;height:56px;background:#fff;border-radius:8px;padding:4px;display:grid;place-items:center}
+.thumb canvas{width:100%;height:100%;image-rendering:pixelated}
+.pass .meta{min-width:0;display:flex;flex-direction:column;gap:2px}
+.pass .label{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pass .sub{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--brand,var(--other));border:1px solid currentColor;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.tag.example{color:var(--muted)}
+.empty{background:var(--sunk);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--muted)}
+.empty ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.empty b{color:var(--ink)}
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));box-shadow:0 8px 24px rgba(0,0,0,.18);padding:14px 22px;font-size:16px}
+.note{font-size:12px;color:var(--muted)}
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgba(5,12,16,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.sheet{background:var(--surface);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:20px max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:16px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sheet-head .x{border:none;background:var(--sunk);color:var(--ink);width:36px;height:36px;border-radius:50%;font-size:18px;flex:none}
+.qrbox{background:#fff;border-radius:16px;padding:12px;align-self:center;width:min(100%,340px)}
+.qrbox canvas{width:100%;height:auto;display:block;image-rendering:pixelated}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;margin:0}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.amt{display:flex;flex-direction:column;gap:8px;background:var(--sunk);border-radius:var(--r);padding:14px}
+.amt label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.amt-row{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:0 12px}
+.amt-row span{font-family:var(--f-display);font-size:22px;color:var(--muted)}
+.amt-row input[type=text]{border:none;background:transparent;color:var(--ink);font-family:var(--f-display);font-size:24px;font-weight:600;width:100%;padding:10px 0;font-variant-numeric:tabular-nums;outline:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:14px;font-variant-numeric:tabular-nums}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.actions .btn{flex:1 1 140px}
+.warn{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+.err{color:var(--danger);font-size:14px}
+input[type=text],textarea{width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+textarea{font-family:var(--f-mono);font-size:12px;min-height:110px;resize:vertical}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>span{font-size:13px;font-weight:600}
+.drop{border:2px dashed var(--line);border-radius:var(--r);padding:22px 16px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;color:var(--muted)}
+.drop.over{border-color:var(--accent);color:var(--ink)}
+.tabs{display:flex;gap:4px;background:var(--sunk);border-radius:999px;padding:4px}
+.tabs button{flex:1;border:none;background:transparent;color:var(--muted);border-radius:999px;padding:8px;font-weight:600}
+.tabs button[aria-selected=true]{background:var(--surface);color:var(--ink)}
+.mono{font-family:var(--f-mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere;background:var(--sunk);border-radius:10px;padding:10px}
+.saved-img{max-width:100%;border-radius:12px;border:1px solid var(--line)}
+.confirm{display:flex;flex-direction:column;gap:10px;border:1px solid var(--danger);border-radius:12px;padding:12px}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+.menu{display:flex;flex-wrap:wrap;gap:8px}
+.menu .btn{padding:8px 14px;font-size:14px}
+.banner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:30}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>QR Pitaka<small>Your GCash, Maya and bank QR codes in one place</small></h1>
+    <div class="status" id="status"><i class="dot on"></i><span>On this phone</span></div>
+  </header>
+  <div class="banner" id="installBanner" hidden><span>Install QR Pitaka on your home screen.</span><button class="btn primary" id="installBtn">Install</button></div>
+  <div class="banner" id="iosBanner" hidden><span>To install: tap Share, then <b>Add to Home Screen</b>.</span><button class="btn ghost" id="iosClose" aria-label="Dismiss">✕</button></div>
+  <div id="intro"></div>
+  <div class="list" id="list"></div>
+  <p class="note">Codes are read from screenshots of your own "Receive" or "My QR" screen. Adding an amount only works in apps that honor amounts on QR Ph codes, so test each wallet with ₱1 first.</p>
+  <div class="menu">
+    <button class="btn" id="backupBtn">Back up codes</button>
+    <button class="btn" id="restoreBtn">Restore backup</button>
+    <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+  </div>
+  <p class="note">Your codes stay on this phone only. Back them up before changing phones or clearing your browser data.</p>
+</div>
+<button class="btn primary fab" id="addBtn">+ Add a QR code</button>
+<div id="sheetRoot"></div>
+
+<script>
+(() => {
+"use strict";
+/* ---------- QR Ph / EMVCo helpers ---------- */
+function crc16(s){let c=0xFFFF;for(let i=0;i<s.length;i++){c^=s.charCodeAt(i)<<8;for(let j=0;j<8;j++){c=(c&0x8000)?((c<<1)^0x1021):(c<<1);c&=0xFFFF}}return c.toString(16).toUpperCase().padStart(4,"0")}
+function parseTLV(s){const out=[];let i=0;while(i<s.length){if(i+4>s.length)return null;const tag=s.substr(i,2),len=parseInt(s.substr(i+2,2),10);if(!/^\d\d$/.test(tag)||isNaN(len))return null;const val=s.substr(i+4,len);if(val.length!==len)return null;out.push({tag,val});i+=4+len}return out}
+const tlv=(t,v)=>t+String(v.length).padStart(2,"0")+v;
+function analyze(payload){
+  const p=(payload||"").trim();
+  const info={payload:p,emv:false,crcOk:false,brand:"other",brandName:"QR code",type:"",name:"",city:"",account:"",amount:"",init:"",bic:""};
+  if(!p.startsWith("000201"))return info;
+  const f=parseTLV(p); if(!f)return info;
+  info.emv=true; info.fields=f;
+  const crcF=f.find(x=>x.tag==="63"); info.crcOk=!!crcF&&p.endsWith(crcF.val)&&crc16(p.slice(0,-4))===crcF.val.toUpperCase();
+  const g=t=>(f.find(x=>x.tag===t)||{}).val||"";
+  info.name=g("59"); info.city=g("60"); info.amount=g("54"); info.init=g("01");
+  for(const x of f){const n=+x.tag; if(n>=26&&n<=51){const sub=parseTLV(x.val)||[]; const s=t=>(sub.find(y=>y.tag===t)||{}).val||"";
+    const guid=s("00").toLowerCase(); info.bic=s("01"); const acct=s("03")||s("04");
+    if(acct) info.account=acct;
+    info.type=guid.includes("p2pqrpay")?"Person-to-person":guid.includes("p2m")?"Merchant":guid?guid:"";
+    if(guid)break;}}
+  const b=lookupBank(info.bic); info.brand=b[0]; info.brandName=b[1];
+  if(!info.bic) info.brandName="QR Ph code";
+  return info;
+}
+const BANKS={GXCHPHM2:["gcash","GCash"],PAPHPHM1:["maya","Maya"],BOPIPHMM:["bank","BPI"],BNORPHMM:["bank","BDO"],MBTCPHMM:["bank","Metrobank"],UBPHPHMM:["bank","UnionBank"],TLBPPHMM:["bank","Landbank"],PNBMPHMM:["bank","PNB"],RCBCPHMM:["bank","RCBC"],SETCPHMM:["bank","Security Bank"],CHBKPHMM:["bank","China Bank"]};
+function lookupBank(bic){if(!bic)return["other","QR code"];const k=bic.slice(0,8).toUpperCase();return BANKS[k]||["bank","Bank "+bic]}
+function withAmount(info,amount){
+  if(!info.emv)return info.payload;
+  let f=info.fields.filter(x=>x.tag!=="63"&&x.tag!=="54").map(x=>({...x}));
+  const pi=f.find(x=>x.tag==="01");
+  if(amount){ if(pi)pi.val="12"; const idx=f.findIndex(x=>+x.tag>54); const a={tag:"54",val:amount}; idx<0?f.push(a):f.splice(idx,0,a); }
+  const body=f.map(x=>tlv(x.tag,x.val)).join("")+"6304";
+  return body+crc16(body);
+}
+function stripAmount(info){ // base payload without amount, original initiation kept unless it had an amount
+  if(!info.emv||!info.amount)return info.payload;
+  const f=info.fields.filter(x=>x.tag!=="63"&&x.tag!=="54").map(x=>({...x}));
+  const pi=f.find(x=>x.tag==="01"); if(pi)pi.val="11";
+  const body=f.map(x=>tlv(x.tag,x.val)).join("")+"6304"; return body+crc16(body);
+}
+const mask=a=>a?("•••• "+a.slice(-4)):"";
+const peso=v=>"₱"+Number(v).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+/* ---------- QR drawing ---------- */
+function drawQR(canvas,text,px){
+  if(typeof qrcode!=="function"){canvas.width=canvas.height=10;return false}
+  const q=qrcode(0,"M"); q.addData(text,"Byte"); q.make();
+  const n=q.getModuleCount(), quiet=4, s=Math.max(1,Math.floor(px/(n+quiet*2)));
+  canvas.width=canvas.height=s*(n+quiet*2);
+  const c=canvas.getContext("2d"); c.fillStyle="#fff"; c.fillRect(0,0,canvas.width,canvas.height); c.fillStyle="#000";
+  for(let r=0;r<n;r++)for(let k=0;k<n;k++)if(q.isDark(r,k))c.fillRect((k+quiet)*s,(r+quiet)*s,s,s);
+  return true;
+}
+const BRAND_HEX={gcash:"#1A5FD6",maya:"#0E9F5B",bank:"#5A4BB5",other:"#3E4A54"};
+function cardImage(item,payload,amount){
+  const info=analyze(item.payload), W=900,H=1240, cv=document.createElement("canvas"); cv.width=W;cv.height=H;
+  const c=cv.getContext("2d"); c.fillStyle="#fff";c.fillRect(0,0,W,H);
+  c.fillStyle=BRAND_HEX[info.brand];c.fillRect(0,0,W,18);
+  c.fillStyle="#13202A";c.textAlign="center";c.font="700 54px 'Bricolage Grotesque', sans-serif";c.fillText(item.label||info.brandName,W/2,110);
+  c.fillStyle="#5A6874";c.font="500 30px Figtree, sans-serif";c.fillText(info.brandName+(info.type?" · "+info.type:""),W/2,158);
+  const q=document.createElement("canvas"); drawQR(q,payload,720); c.imageSmoothingEnabled=false; c.drawImage(q,(W-720)/2,200,720,720);
+  let y=990; if(info.name){c.fillStyle="#13202A";c.font="600 40px Figtree, sans-serif";c.fillText(info.name,W/2,y);y+=56}
+  if(amount){c.fillStyle=BRAND_HEX[info.brand];c.font="800 64px 'Bricolage Grotesque', sans-serif";c.fillText(peso(amount),W/2,y+20);y+=86}
+  c.fillStyle="#5A6874";c.font="400 26px Figtree, sans-serif";c.fillText("Scan with any QR Ph–enabled app",W/2,H-50);
+  return cv;
+}
+
+/* ---------- decoding images ---------- */
+async function decodeFile(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error("img"));i.src=url});
+    if(typeof jsQR!=="function")throw new Error("The QR reader didn't load. Check your connection and reopen the page.");
+    for(const max of [1400,900,600,2000]){
+      const sc=Math.min(1,max/Math.max(img.width,img.height)), w=Math.round(img.width*sc), h=Math.round(img.height*sc);
+      const cv=document.createElement("canvas");cv.width=w;cv.height=h;const c=cv.getContext("2d");c.drawImage(img,0,0,w,h);
+      const r=jsQR(c.getImageData(0,0,w,h).data,w,h,{inversionAttempts:"attemptBoth"});
+      if(r&&r.data)return r.data;
+    }
+    throw new Error("No QR code found in that image. Crop the screenshot closer to the code and try again.");
+  }finally{URL.revokeObjectURL(url)}
+}
+
+/* ---------- storage: on this phone ---------- */
+const LKEY="qr-pitaka-items";
+const local={read(){try{const a=JSON.parse(localStorage.getItem(LKEY)||"[]");return Array.isArray(a)?a:[]}catch{return[]}},
+  write(a){localStorage.setItem(LKEY,JSON.stringify(a))}};
+let items=local.read();
+function commit(next){local.write(next);items=next;render()}
+const store={
+  async add(it){commit([...items,it])},
+  async update(id,patch){commit(items.map(i=>i.id===id?{...i,...patch}:i))},
+  async remove(id){commit(items.filter(i=>i.id!==id))}
+};
+function setStatus(on,text){const s=document.getElementById("status");s.querySelector(".dot").classList.toggle("on",on);s.querySelector("span").textContent=text}
+function toast(msg){const t=el("div",{class:"toast",role:"status"},msg);document.body.append(t);setTimeout(()=>t.remove(),2600)}
+async function connect(){
+  try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch{}
+  try{localStorage.setItem("qr-pitaka-test","1");localStorage.removeItem("qr-pitaka-test")}catch{setStatus(false,"Can't save here (private browsing?)")}
+}
+/* saving files: real download, or the share sheet on phones */
+function saveBlob(blob,filename){const u=URL.createObjectURL(blob);const a=el("a",{href:u,download:filename});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+async function shareBlob(blob,filename,title){
+  const f=new File([blob],filename,{type:blob.type});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title});return true}catch(e){if(e&&e.name==="AbortError")return true}}
+  return false;
+}
+/* backups */
+document.addEventListener("DOMContentLoaded",()=>{
+  document.getElementById("backupBtn").addEventListener("click",()=>{
+    if(!items.length){toast("Nothing to back up yet.");return}
+    const data=JSON.stringify({app:"qr-pitaka",version:1,exportedAt:new Date().toISOString(),items},null,2);
+    const d=new Date().toISOString().slice(0,10);
+    saveBlob(new Blob([data],{type:"application/json"}),`qr-pitaka-backup-${d}.json`);
+    toast("Backup saved to your downloads.");
+  });
+  const rf=document.getElementById("restoreFile");
+  document.getElementById("restoreBtn").addEventListener("click",()=>rf.click());
+  rf.addEventListener("change",async()=>{
+    const f=rf.files[0]; rf.value=""; if(!f)return;
+    try{
+      const j=JSON.parse(await f.text()); const list=Array.isArray(j)?j:j.items;
+      if(!Array.isArray(list))throw 0;
+      const have=new Set(items.map(i=>i.payload)); let added=0; const next=[...items];
+      for(const it of list){if(!it||typeof it.payload!=="string"||have.has(it.payload))continue;
+        next.push({id:"q"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),label:String(it.label||"QR code").slice(0,60),payload:it.payload,createdAt:it.createdAt||Date.now()});have.add(it.payload);added++}
+      commit(next); toast(added?`Restored ${added} code${added>1?"s":""}.`:"Those codes are already here.");
+    }catch{toast("That file isn't a QR Pitaka backup.")}
+  });
+});
+
+/* ---------- example (shown only while empty, never stored) ---------- */
+const EXAMPLE=(()=>{const acct=tlv("00","com.p2pqrpay")+tlv("01","SAMPLEPHXXX")+tlv("03","0000001234");
+  const body=tlv("00","01")+tlv("01","11")+tlv("27",acct)+tlv("52","6016")+tlv("53","608")+tlv("58","PH")+tlv("59","JUAN DELA CRUZ")+tlv("60","MANILA")+"6304";
+  return {id:"example",label:"Example wallet",payload:body+crc16(body),example:true}})();
+
+/* ---------- rendering ---------- */
+const el=(t,a={},...kids)=>{const e=document.createElement(t);for(const[k,v]of Object.entries(a)){if(k==="class")e.className=v;else if(k==="style")e.setAttribute("style",v);else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(v!==false&&v!=null)e.setAttribute(k,v===true?"":v)}for(const k of kids.flat())if(k!=null&&k!==false)e.append(k.nodeType?k:document.createTextNode(k));return e};
+function render(){
+  const list=document.getElementById("list"), intro=document.getElementById("intro"); list.replaceChildren(); intro.replaceChildren();
+  const shown=items.length?items:[EXAMPLE];
+  if(!items.length) intro.append(el("div",{class:"empty"},
+    el("b",{},"Add your first code"),
+    el("ol",{},el("li",{},"Open GCash, Maya or your bank app and go to Receive / My QR."),el("li",{},"Take a screenshot (or tap Save QR in the app)."),el("li",{},"Tap Add a QR code below and choose that screenshot.")),
+    "The card below is an example so you can see how it works."));
+  for(const it of shown){
+    const info=analyze(it.payload), th=el("canvas");
+    drawQR(th,it.payload,96);
+    const sub=[info.name, mask(info.account)].filter(Boolean).join(" · ")||(info.emv?info.brandName:"Non-standard code");
+    list.append(el("button",{class:"pass",style:`--brand:var(--${info.brand})`,onclick:()=>openDetail(it)},
+      el("span",{class:"thumb"},th),
+      el("span",{class:"meta"},el("span",{class:"label"},it.label||info.brandName),el("span",{class:"sub"},sub)),
+      it.example?el("span",{class:"tag example"},"Example"):el("span",{class:"tag"},info.brandName.replace(/^Bank /,""))));
+  }
+}
+
+/* ---------- sheets ---------- */
+let wake=null;
+function closeSheet(){document.getElementById("sheetRoot").replaceChildren();if(wake){wake.release().catch(()=>{});wake=null}document.getElementById("addBtn").hidden=false}
+function sheet(title,...body){
+  const root=document.getElementById("sheetRoot");
+  const s=el("div",{class:"sheet",role:"dialog","aria-modal":"true","aria-label":title},
+    el("div",{class:"sheet-head"},el("h2",{},title),el("button",{class:"x","aria-label":"Close",onclick:closeSheet},"✕")),...body);
+  const scrim=el("div",{class:"scrim",onclick:e=>{if(e.target===scrim)closeSheet()}},s);
+  root.replaceChildren(scrim); document.getElementById("addBtn").hidden=true; return s;
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
+
+async function copyText(t,btn){const old=btn.textContent;try{await navigator.clipboard.writeText(t);btn.textContent="Copied"}catch{const r=document.createRange(),m=document.querySelector("#payloadText");if(m){r.selectNodeContents(m);const s=getSelection();s.removeAllRanges();s.addRange(r)}btn.textContent="Selected — copy it"}setTimeout(()=>btn.textContent=old,1800)}
+
+function openDetail(it){
+  const info=analyze(it.payload), base=stripAmount(info), baseInfo=analyze(base);
+  let amount=info.amount||"";
+  const cv=el("canvas"), box=el("div",{class:"qrbox"},cv);
+  const payloadText=el("div",{class:"mono",id:"payloadText"});
+  const amtNote=el("div",{class:"note"});
+  function refresh(){const p=amount?withAmount(baseInfo,amount):base;drawQR(cv,p,640);payloadText.textContent=p;amtNote.textContent=amount?`This code now asks for ${peso(amount)}.`:"No amount. The payer types it in.";return p}
+  const input=el("input",{id:"amt",inputmode:"decimal",type:"text",placeholder:"0.00",value:amount,"aria-label":"Amount in pesos"});
+  const err=el("div",{class:"err",role:"alert"});
+  input.addEventListener("input",()=>{const v=input.value.replace(/[^\d.]/g,"");input.value=v;
+    if(!v){amount="";err.textContent="";refresh();return}
+    const n=Number(v); if(!isFinite(n)||n<=0||n>9999999.99||!/^\d+(\.\d{0,2})?$/.test(v)){err.textContent="Enter an amount from ₱0.01 to ₱9,999,999.99, up to two decimals.";return}
+    err.textContent=""; amount=n.toFixed(2); refresh()});
+  const setAmt=v=>{input.value=v?String(v):"";input.dispatchEvent(new Event("input"))};
+  const amtBlock=info.emv?el("div",{class:"amt"},el("label",{for:"amt"},"Request an amount"),
+      el("div",{class:"amt-row"},el("span",{},"₱"),input),
+      el("div",{class:"chips"},[20,50,100,500,1000].map(v=>el("button",{class:"chip",onclick:()=>setAmt(v)},peso(v).replace(".00",""))),el("button",{class:"chip",onclick:()=>setAmt("")},"Clear")),
+      err,amtNote)
+    :el("p",{class:"warn"},"This code isn't in the QR Ph format, so an amount can't be added. It can still be shown and saved.");
+  const facts=el("dl",{class:"facts"},
+    el("dt",{},"Provider"),el("dd",{},info.brandName),
+    info.type?[el("dt",{},"Type"),el("dd",{},info.type)]:null,
+    info.name?[el("dt",{},"Name"),el("dd",{},info.name)]:null,
+    info.account?[el("dt",{},"Account"),el("dd",{},mask(info.account))]:null,
+    info.city?[el("dt",{},"City"),el("dd",{},info.city)]:null,
+    info.emv?[el("dt",{},"Checksum"),el("dd",{},info.crcOk?"Valid":"Doesn't match. The app may reject this code.")]:null);
+  const saveOut=el("div");
+  const saveBtn=el("button",{class:"btn primary",onclick:async()=>{
+    const p=refresh(), card=cardImage(it,p,amount), name=(it.label||info.brandName).replace(/[^\w-]+/g,"-")+(amount?"-"+amount:"")+".png";
+    const blob=await new Promise(r=>card.toBlob(r,"image/png"));
+    if(await shareBlob(blob,name,it.label||info.brandName))return;
+    saveBlob(blob,name);
+    saveOut.replaceChildren(el("p",{class:"note"},"Image saved to your downloads. You can also press and hold it below to save or share."),el("img",{class:"saved-img",src:card.toDataURL("image/png"),alt:"QR code image for "+(it.label||info.brandName)}));
+  }},"Save or share image");
+  const copyBtn=el("button",{class:"btn",onclick:e=>copyText(payloadText.textContent,e.currentTarget)},"Copy code text");
+  const manage=it.example?el("p",{class:"warn"},"This is an example with a fake account, so no app will send money to it. Add your own code to replace it."):(()=>{
+    const wrap=el("div",{class:"actions"});
+    const renameBtn=el("button",{class:"btn ghost",onclick:()=>{
+      const f=el("input",{type:"text",id:"rename",value:it.label||"","aria-label":"New name"});
+      const ok=el("button",{class:"btn primary",onclick:async()=>{const v=f.value.trim();if(!v)return;await store.update(it.id,{label:v});it.label=v;closeSheet()}},"Save name");
+      wrap.replaceChildren(el("div",{class:"field",style:"flex:1 1 100%"},el("span",{},"Name"),f),ok,el("button",{class:"btn ghost",onclick:()=>wrap.replaceWith(manage2())},"Cancel"));f.focus()}},"Rename");
+    const delBtn=el("button",{class:"btn ghost danger",onclick:()=>{
+      wrap.replaceChildren(el("div",{class:"confirm",style:"flex:1 1 100%"},el("span",{},`Remove "${it.label||info.brandName}" from QR Pitaka? Your account in the app isn't affected.`),
+        el("div",{class:"actions"},el("button",{class:"btn danger",onclick:async()=>{await store.remove(it.id);closeSheet()}},"Remove"),el("button",{class:"btn ghost",onclick:()=>wrap.replaceWith(manage2())},"Keep it"))))}},"Remove");
+    wrap.append(renameBtn,delBtn); return wrap})();
+  function manage2(){openDetail(it);return el("span")}
+  sheet(it.label||info.brandName,box,amtBlock,el("div",{class:"actions"},saveBtn,copyBtn),saveOut,facts,
+    el("details",{},el("summary",{class:"note"},"Raw code text"),payloadText),manage);
+  refresh();
+  if(navigator.wakeLock)navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{});
+}
+
+function openAdd(){
+  let tab="image";
+  const content=el("div",{style:"display:flex;flex-direction:column;gap:14px"});
+  const tabs=el("div",{class:"tabs",role:"tablist"});
+  const result=el("div",{style:"display:flex;flex-direction:column;gap:14px"});
+  function setTab(t){tab=t;[...tabs.children].forEach(b=>b.setAttribute("aria-selected",b.dataset.t===t));result.replaceChildren();content.replaceChildren(t==="image"?imagePane():pastePane())}
+  tabs.append(el("button",{role:"tab","data-t":"image",onclick:()=>setTab("image")},"Screenshot"),el("button",{role:"tab","data-t":"paste",onclick:()=>setTab("paste")},"Paste code text"));
+  function imagePane(){
+    const file=el("input",{type:"file",id:"qrfile",accept:"image/*",hidden:true});
+    const drop=el("label",{class:"drop",for:"qrfile"},el("b",{style:"color:var(--ink)"},"Choose a screenshot"),"or drop an image here. Crop it close to the QR if it's not found.");
+    const go=async f=>{if(!f)return;result.replaceChildren(el("p",{class:"note"},"Reading the code…"));try{showResult(await decodeFile(f))}catch(e){result.replaceChildren(el("p",{class:"err"},e.message||"That image couldn't be read."))}};
+    file.addEventListener("change",()=>go(file.files[0]));
+    drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over")});
+    drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+    drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");go(e.dataTransfer.files[0])});
+    return el("div",{style:"display:flex;flex-direction:column;gap:8px"},drop,file);
+  }
+  function pastePane(){
+    const ta=el("textarea",{id:"paste",placeholder:"00020101021127…","aria-label":"QR code text"});
+    return el("div",{class:"field"},el("span",{},"Code text (starts with 000201 for QR Ph)"),ta,
+      el("button",{class:"btn",onclick:()=>{const v=ta.value.trim();if(!v){result.replaceChildren(el("p",{class:"err"},"Paste the code text first."));return}showResult(v)}},"Read code"));
+  }
+  function showResult(payload){
+    const info=analyze(payload), cv=el("canvas"); drawQR(cv,payload,400);
+    const dup=items.some(i=>i.payload===payload);
+    const name=el("input",{type:"text",id:"label",value:info.emv?info.brandName.replace(/^Bank /,""):"My QR"});
+    const warn=!info.emv?el("p",{class:"warn"},"This isn't a QR Ph code. You can still keep it, but amounts and details won't be available."):
+      !info.crcOk?el("p",{class:"warn"},"The checksum doesn't match, so payment apps may refuse this code. Try a clearer screenshot."):null;
+    const fail=el("p",{class:"err",role:"alert"});
+    result.replaceChildren(
+      el("div",{class:"pass",style:`--brand:var(--${info.brand});cursor:default`},el("span",{class:"thumb"},cv),
+        el("span",{class:"meta"},el("span",{class:"label"},info.name||info.brandName),el("span",{class:"sub"},[info.brandName,info.type,mask(info.account)].filter(Boolean).join(" · "))),
+        el("span",{class:"tag"},info.emv?"QR Ph":"Other")),
+      warn, dup?el("p",{class:"warn"},"You've already saved this exact code."):null,
+      el("label",{class:"field",for:"label"},el("span",{},"Name it"),name),
+      el("button",{class:"btn primary",onclick:async e=>{e.currentTarget.disabled=true;
+        try{await store.add({id:"q"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),label:name.value.trim()||info.brandName,payload,createdAt:Date.now()});closeSheet()}
+        catch(err){e.currentTarget.disabled=false;fail.textContent="Couldn't save it. Your phone may be out of storage, or this is a private browsing window."}}},"Save to QR Pitaka"),fail);
+  }
+  sheet("Add a QR code",tabs,content,result); setTab("image");
+}
+document.getElementById("addBtn").addEventListener("click",openAdd);
+
+/* ---------- boot ---------- */
+/* install prompt + offline */
+let deferred=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;document.getElementById("installBanner").hidden=false});
+window.addEventListener("appinstalled",()=>{document.getElementById("installBanner").hidden=true;toast("Installed. Open it from your home screen.")});
+document.addEventListener("DOMContentLoaded",()=>{
+  document.getElementById("installBtn").addEventListener("click",async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;document.getElementById("installBanner").hidden=true});
+  const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  let dismissed=false;try{dismissed=localStorage.getItem("qr-pitaka-ios-tip")==="1"}catch{}
+  if(ios&&!standalone&&!dismissed)document.getElementById("iosBanner").hidden=false;
+  document.getElementById("iosClose").addEventListener("click",()=>{document.getElementById("iosBanner").hidden=true;try{localStorage.setItem("qr-pitaka-ios-tip","1")}catch{}});
+});
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+const start=()=>{render();connect()};
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
+})();
+</script>
+
+</body>
+</html>
